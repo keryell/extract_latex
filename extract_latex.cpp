@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
       }) |
       stdr::to<std::vector>;
   stdr::sort(files);
-  auto files_to_copy =
+  auto interesting_files =
       files | stdr::views::unique | stdr::views::filter([](auto&& line) {
         // Just keep the interesting files. Could be optimized...
         return !(line.starts_with("/etc") || line.starts_with("/usr") ||
@@ -51,7 +51,23 @@ int main(int argc, char* argv[]) {
                  line.ends_with(".nav") || line.ends_with(".out") ||
                  line.ends_with(".toc") || line.ends_with(".vrb")) &&
                line.starts_with(beamer_directory);
+      });
+  // There is a lot of duplication since I did not get how to generate
+  // optional elements on the fly
+  auto svg_files =
+      interesting_files | stdr::views::filter([](auto&& line) {
+        // Select only the input files
+        return exists(std::filesystem::path { line }.replace_extension("svg"));
       }) |
+      stdr::views::transform(
+          // Change the extension of the selected file
+          [](auto&& line) {
+            return std::string {
+              std::filesystem::path { line }.replace_extension("svg")
+            };
+          });
+  auto files_to_copy =
+      stdr::views::concat(interesting_files, svg_files) |
       stdr::views::transform(
           // Remove the beamer directory path
           [](auto&& line) { return line.substr(beamer_directory.size()); });
